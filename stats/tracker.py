@@ -3,11 +3,15 @@ class MatchStats:
     Phase D: Tracks advanced statistics throughout the match.
     """
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.possession_ticks = {0: 0, 1: 0}
         self.passes_attempted = {0: 0, 1: 0}
         self.shots = {0: 0, 1: 0}
         self.tackles = {0: 0, 1: 0}
         self.last_possessor = None
+
 
     def update_possession(self, closest_player):
         """Called every frame to evaluate who is closest to the ball."""

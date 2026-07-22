@@ -17,20 +17,23 @@ class CollisionSystem:
 
     def _resolve_player_ball_collisions(self):
         for player in self.players:
-            distance = player.position.distance_to(self.ball.position)
+            # Check 2D ground distance
+            distance_2d = player.position.distance_to(self.ball.position)
             min_dist = player.radius + self.ball.radius
 
-            if distance < min_dist and distance > 0:
-                overlap = min_dist - distance
+            # Players can collide with ball if 2D distance is within range and ball z is below player body height (35.0)
+            if distance_2d < min_dist and distance_2d > 0 and self.ball.z <= 35.0:
+                overlap = min_dist - distance_2d
                 push_dir = (self.ball.position - player.position).normalize()
 
-                # Separate
+                # Separate in 2D
                 self.ball.position += push_dir * overlap
 
-                # Dribble: set ball velocity based on player speed
+                # Dribble impulse: set ball velocity based on player speed
                 player_speed = player.velocity.length()
                 if player_speed > 0:
                     self.ball.velocity = push_dir * (player_speed * 1.1)
+
 
     def _resolve_player_player_collisions(self):
         for i in range(len(self.players)):

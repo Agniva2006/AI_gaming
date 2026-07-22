@@ -1,3 +1,5 @@
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import pygame
 import sys
 
@@ -11,9 +13,18 @@ from ai.ai_controller import AIController
 from stats.tracker import match_stats
 from debug.overlay import DebugOverlay
 from analytics.report import generate_match_report
-
+from ui.menu import MainMenu
+from ui.dashboard import TrainingDashboard
+from rl_env.nn_brain import create_neural_brain
+from rl_env.trainer import PPOTrainer
+from tactics.manager import DynamicManagerAI
 
 class Game:
+    """
+    Main Game Engine for RL Train Football:
+    Handles 100% autonomous multi-agent GNN-PPO matches, live training suites,
+    telemetry dashboards, and dynamic camera rendering.
+    """
     def __init__(self):
         pygame.init()
 
@@ -22,41 +33,41 @@ class Game:
 
         self.clock = pygame.time.Clock()
         self.running = True
+        self.state = "MENU"  # MENU, GAMEPLAY, TRAIN_MODE
 
-        # --- Create teams ---
-        self.team_a = Team(
-            team_id=0,
-            color=settings.TEAM_A_COLOR,
-            formation_type="4-3-3",
-            attack_direction=1   # attacks right
-        )
-        self.team_b = Team(
-            team_id=1,
-            color=settings.TEAM_B_COLOR,
-            formation_type="4-4-2",
-            attack_direction=-1  # attacks left
-        )
+        self.menu = MainMenu(self.screen)
+        self.neural_brain = create_neural_brain()
+        self.trainer = PPOTrainer()
+        self.dashboard = TrainingDashboard(self.screen)
 
-        # Human controls the nearest outfield player on Team A
-        self.controlled_player = self.team_a.players[9]  # start with a striker
-        self.controlled_player.is_controlled = True
+        self._init_gameplay()
 
-        # --- Create ball ---
+    def _init_gameplay(self):
+        self.team_a = Team(0, settings.TEAM_A_COLOR, "4-3-3", 1)
+        self.team_b = Team(1, settings.TEAM_B_COLOR, "4-4-2", -1)
+
+        # 100% Autonomous — No player is manually keyboard-controlled
+        for p in self.team_a.players:
+            p.is_controlled = False
+        for p in self.team_b.players:
+            p.is_controlled = False
+
         self.ball = Ball(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2)
 
-        # --- Build entities list (all 22 players + ball) ---
         self.all_players = self.team_a.players + self.team_b.players
         self.entities = self.all_players + [self.ball]
 
-        # --- Systems ---
         self.renderer = Renderer(self.screen)
         self.collision_system = CollisionSystem(self.all_players, self.ball)
         self.match = Match(self.team_a, self.team_b, self.ball)
 
-        # AI controls Team B AND the non-controlled players on Team A
-        self.ai_team_b = AIController(self.team_b, self.team_a, self.ball)
-        self.ai_team_a = AIController(self.team_a, self.team_b, self.ball)
-        
+        # Autonomous GNN-PPO AI controllers on both teams
+        self.ai_team_b = AIController(self.team_b, self.team_a, self.ball, neural_brain=self.neural_brain)
+        self.ai_team_a = AIController(self.team_a, self.team_b, self.ball, neural_brain=self.neural_brain)
+
+        self.manager_a = DynamicManagerAI(self.team_a)
+        self.manager_b = DynamicManagerAI(self.team_b)
+
         self.debug_overlay = DebugOverlay()
         self.report_generated = False
 
@@ -65,7 +76,7 @@ class Game:
             dt = self._tick()
             self._handle_events()
             self._update(dt)
-            self._render()
+            self._render(dt)
         self.quit()
 
     def _tick(self):
@@ -76,56 +87,61 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
 
-            if event.type == pygame.KEYDOWN and self.match.is_playing:
-                # Space = pass
-                if event.key == pygame.K_SPACE:
-                    self.controlled_player.pass_ball(self.ball)
-
-                # J = shoot toward Team A's target goal
-                if event.key == pygame.K_j:
-                    self.controlled_player.shoot(self.ball, self.team_a.target_goal)
-
-                # K = switch to nearest teammate to ball
-                if event.key == pygame.K_k:
-                    self._switch_player()
-                    
-            if event.type == pygame.KEYDOWN:
-                # F3 = toggle debug overlay
-                if event.key == pygame.K_F3:
-                    self.debug_overlay.toggle()
-
-    def _switch_player(self):
-        """Switch control to the Team A player closest to the ball (excluding GK)."""
-        self.controlled_player.is_controlled = False
-        new_player = self.team_a.get_closest_to_ball(self.ball, exclude_gk=True)
-        if new_player:
-            new_player.is_controlled = True
-            self.controlled_player = new_player
+            if self.state == "MENU":
+                action = self.menu.handle_event(event)
+                if action in ["neural_match", "voronoi"]:
+                    self._init_gameplay()
+                    self.state = "GAMEPLAY"
+                elif action == "train_mode":
+                    self._init_gameplay()
+                    self.state = "TRAIN_MODE"
+                elif action == "quit":
+                    self.running = False
+            elif self.state in ["GAMEPLAY", "TRAIN_MODE"]:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.state = "MENU"
+                    elif event.key == pygame.K_F3:
+                        self.debug_overlay.toggle()
 
     def _update(self, dt):
+        if self.state == "MENU":
+            return
+
+        if self.state == "TRAIN_MODE":
+            # Run background PPO step & update dashboard telemetry
+            step_info = self.trainer.train_step(num_episodes=1)
+            self.dashboard.update_metrics(step_info["reward"], step_info["realism"])
+
         if not self.match.is_playing:
             self.match.update(dt)
-            if self.match.state == "FULL_TIME" and not self.report_generated:
+            if self.match.state == "GOAL_SCORED":
+                self.match.trigger_net_ripple(self.renderer)
+            elif self.match.state == "FULL_TIME" and not self.report_generated:
                 report = generate_match_report(self.match, match_stats)
                 print(report)
                 self.report_generated = True
             return
 
-        # 1. AI sets velocities for computer-controlled players
+        # 1. Update Dynamic Managers
+        self.manager_a.update_tactics(self.match)
+        self.manager_b.update_tactics(self.match)
+
+        # 2. Autonomous GNN-PPO AI controllers update
         self.ai_team_b.update(dt)
         self.ai_team_a.update(dt)
 
-        # 2. All entities update (movement)
+        # 3. All entities update (movement + inertia)
         for entity in self.entities:
             entity.update(dt)
 
-        # 3. Resolve collisions
+        # 4. Resolve collisions
         self.collision_system.update()
 
-        # 4. Check match rules (goals, etc.)
+        # 5. Check match rules
         self.match.update(dt)
-        
-        # 5. Track possession stats
+
+        # 6. Possession tracking
         closest = None
         closest_dist = float('inf')
         for p in self.all_players:
@@ -136,11 +152,19 @@ class Game:
         if closest_dist < 40:
             match_stats.update_possession(closest)
 
-    def _render(self):
-        self.renderer.render(self.entities, self.controlled_player, self.match)
-        self.debug_overlay.render(self.screen, self.all_players)
+    def _render(self, dt):
+        if self.state == "MENU":
+            self.menu.render()
+        else:
+            self.renderer.render(self.entities, controlled_player=None, match=self.match, dt=dt)
+            self.debug_overlay.render(self.screen, self.all_players)
+
+            if self.state == "TRAIN_MODE":
+                self.dashboard.render()
+
         pygame.display.flip()
 
     def quit(self):
+        self.trainer.close()
         pygame.quit()
         sys.exit()

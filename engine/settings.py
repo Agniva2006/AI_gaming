@@ -8,8 +8,9 @@ FIELD_COLOR = (34, 139, 34)
 FIELD_COLOR_DARK = (30, 120, 30)    # alternating grass stripes
 LINE_COLOR = (255, 255, 255)
 
-TITLE = "Adaptive Football"
+TITLE = "RL Train Football"
 FPS = 60
+
 
 # Ball constants
 BALL_RADIUS = 8

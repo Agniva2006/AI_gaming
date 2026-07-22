@@ -54,7 +54,18 @@ class Match:
         self.last_scorer = team_id
         self.state = "GOAL_SCORED"
         self.pause_timer = settings.KICKOFF_PAUSE
-        self.ball.velocity = pygame.math.Vector2(0, 0)
+        self.ball.velocity_3d = pygame.math.Vector3(0, 0, 0)
+        self.ball.z = 0.0
+
+    def trigger_net_ripple(self, renderer):
+        """Displace physical goal net grid on goal score."""
+        if self.last_scorer == 0:
+            renderer.right_net.trigger_impact(self.ball.position.y, power=250.0)
+            renderer.particle_system.emit_goal_sparks(settings.SCREEN_WIDTH, self.ball.position.y, count=40)
+        elif self.last_scorer == 1:
+            renderer.left_net.trigger_impact(self.ball.position.y, power=250.0)
+            renderer.particle_system.emit_goal_sparks(0, self.ball.position.y, count=40)
+
 
     def _kickoff(self):
         self.team_a.reset_positions()

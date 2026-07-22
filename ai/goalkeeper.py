@@ -167,22 +167,13 @@ class GoalkeeperAI:
         return None  # off target — let it go
 
     def _nearest_opponent_with_ball(self):
-        """Find the nearest opponent who is close to the ball."""
-        # Determine opponent team
-        from entities.team import Team  # local import to avoid circular
-
-        for entity in []:  # we'll use the opponent reference
-            pass
-
-        # Check all opponents — we need the opponent team reference
-        # Since we don't have direct access, check ball proximity
-        # If ball is close to our goal and moving slowly, someone nearby has it
+        """Find proximity to goal area when opponent ball carrier approaches."""
         ball_dist_to_goal = abs(self.ball.position.x - self.goal_line_x)
         if ball_dist_to_goal < settings.GK_COME_OUT_DISTANCE:
-            if self.ball.velocity.length() < 100:
-                return self.ball  # treat ball position as "attacker" position
-
+            if self.ball.velocity.length() < 250:
+                return self.ball
         return None
+
 
     def _move_toward(self, target, speed):
         """Set player velocity toward a target."""

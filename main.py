@@ -1,4 +1,7 @@
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 from engine.game import Game
+
 
 def main():
     game = Game()

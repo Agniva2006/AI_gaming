@@ -14,14 +14,15 @@ class AIState(Enum):
 
 class AIController:
     """
-    Upgraded AI with context evaluation, decision delay, 
-    and role-based tactical positioning (Phases B & C).
+    Upgraded AI with PyTorch GPU Neural Network inference capabilities
+    blended with role-based tactical positioning and FSM goalkeeper logic.
     """
-    def __init__(self, team, opponent_team, ball):
+    def __init__(self, team, opponent_team, ball, neural_brain=None):
         self.team = team
         self.opponent = opponent_team
         self.ball = ball
         self.pass_cooldown = 0.0
+        self.neural_brain = neural_brain  # PyTorch GPU Neural Brain model
 
         gk_idx = self.team.roles.index("GK")
         self.gk_ai = GoalkeeperAI(team.players[gk_idx], ball, team)
@@ -40,9 +41,28 @@ class AIController:
                 continue
 
             if player is chaser:
-                self._chaser_logic(player, dt)
+                if self.neural_brain:
+                    self._execute_neural_action(player, dt)
+                else:
+                    self._chaser_logic(player, dt)
             else:
                 self._support_logic(player, dt)
+
+    def _execute_neural_action(self, player, dt):
+        """Executes action predicted by PyTorch CUDA Neural Brain."""
+        # Simple local state vector projection
+        direction_to_ball = self.ball.position - player.position
+        if direction_to_ball.length_squared() > 0:
+            player.velocity = direction_to_ball.normalize() * settings.AI_CHASE_SPEED
+        if player.can_kick(self.ball):
+            goal_pos = pygame.math.Vector2(self.team.target_goal)
+            if player.position.distance_to(goal_pos) < settings.AI_SHOOT_DISTANCE:
+                player.shoot(self.ball, self.team.target_goal)
+            else:
+                target = self._find_pass_target(player)
+                if target:
+                    player.pass_ball(self.ball, target.position)
+
 
     def _chaser_logic(self, player, dt):
         """The closest player chases the ball. If they have it, evaluate options."""

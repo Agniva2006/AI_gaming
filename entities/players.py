@@ -33,7 +33,23 @@ class Player(Entity):
         if self.is_controlled:
             self._handle_input()
 
-        # Phase A: Fatigue & Stamina Logic
+        # 1. Physical Acceleration & Turning Inertia
+        # Target velocity is set by AI/input; actual velocity smoothly accelerates/turns toward target
+        target_vel = self.velocity.copy()
+        current_vel = getattr(self, 'current_vel', pygame.math.Vector2(0, 0))
+        accel_rate = 800.0 * dt  # px/s² linear acceleration rate
+
+        vel_diff = target_vel - current_vel
+        if vel_diff.length_squared() > 0:
+            if vel_diff.length() <= accel_rate:
+                current_vel = target_vel.copy()
+            else:
+                current_vel += vel_diff.normalize() * accel_rate
+
+        self.current_vel = current_vel
+        self.velocity = current_vel.copy()
+
+        # 2. Phase A: Fatigue & Stamina Logic
         current_speed_len = self.velocity.length()
         if current_speed_len > self.speed * 1.1:
             self.profile.current_stamina -= 5.0 * dt  # sprinting drains
@@ -41,12 +57,11 @@ class Player(Entity):
             self.profile.current_stamina += 2.0 * dt  # resting recovers
         self.profile.current_stamina = max(0, min(100, self.profile.current_stamina))
 
-        # Phase A: Apply attributes to actual speed
+        # 3. Apply attributes to actual speed
         mult = self.profile.get_current_speed_mult()
         actual_speed = (self.speed + (self.profile.pace - 75)) * mult
         
         if current_speed_len > 0:
-            # Scale velocity based on attributes and stamina
             target_mag = min(current_speed_len, actual_speed * (1.5 if self.is_controlled and pygame.key.get_pressed()[pygame.K_LSHIFT] else 1.0))
             self.velocity = self.velocity.normalize() * target_mag
 
@@ -56,6 +71,7 @@ class Player(Entity):
         self.position.y = max(self.radius, min(self.position.y, settings.SCREEN_HEIGHT - self.radius))
         
         self.decision_timer = max(0, self.decision_timer - dt)
+
 
     def _handle_input(self):
         keys = pygame.key.get_pressed()
@@ -75,9 +91,10 @@ class Player(Entity):
 
     def can_kick(self, ball):
         distance = self.position.distance_to(ball.position)
-        return distance < (self.radius + ball.radius + settings.KICK_RANGE)
+        # Check 2D distance and 3D height threshold (players can reach up to z=60 for headers/volleys)
+        return (distance < (self.radius + ball.radius + settings.KICK_RANGE)) and (ball.z < 60.0)
 
-    def pass_ball(self, ball, target_pos=None):
+    def pass_ball(self, ball, target_pos=None, lofted=False):
         if self.can_kick(ball):
             if target_pos is not None:
                 direction = pygame.math.Vector2(target_pos) - self.position
@@ -88,14 +105,17 @@ class Player(Entity):
                 direction = direction.normalize()
                 
             # Phase C: Passing error margin based on attributes
-            error_range = (100 - self.profile.passing) * 0.4 # up to 16 degrees error
+            error_range = (100 - self.profile.passing) * 0.4
             angle_offset = random.uniform(-error_range, error_range)
             direction = direction.rotate(angle_offset)
             
-            ball.kick(direction, settings.PASS_POWER)
+            lift_val = 250.0 if lofted else (40.0 if ball.z > 15 else 0.0)
+            spin_val = random.uniform(-0.3, 0.3) if self.profile.passing > 80 else 0.0
+            
+            ball.kick(direction, settings.PASS_POWER, lift=lift_val, spin=spin_val)
             match_stats.record_pass(self.team_id)
 
-    def shoot(self, ball, target):
+    def shoot(self, ball, target, chip=False):
         if self.can_kick(ball):
             goal_pos = pygame.math.Vector2(target)
             direction = goal_pos - self.position
@@ -103,10 +123,12 @@ class Player(Entity):
             if direction.length_squared() > 0:
                 direction = direction.normalize()
                 
-            # Phase C: Shooting error margin
             error_range = (100 - self.profile.shooting) * 0.3
             direction = direction.rotate(random.uniform(-error_range, error_range))
             
             shot_power = settings.SHOOT_POWER + (self.profile.shooting - 75) * 3
-            ball.kick(direction, shot_power)
-            match_stats.record_shot(self.team_id)
+            lift_val = 320.0 if chip else (120.0 if random.random() < 0.4 else 0.0)
+            spin_val = random.choice([-0.8, 0.8]) if self.profile.shooting > 82 else 0.0
+            
+            ball.kick(direction, shot_power, lift=lift_val, spin=spin_val)
+            match_stats.record_shot(self.team_id)
