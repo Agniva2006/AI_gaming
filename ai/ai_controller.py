@@ -50,28 +50,32 @@ class AIController:
 
     def _execute_neural_action(self, player, dt):
         """Executes action predicted by PyTorch CUDA Neural Brain."""
-        # Simple local state vector projection
         direction_to_ball = self.ball.position - player.position
         if direction_to_ball.length_squared() > 0:
             player.velocity = direction_to_ball.normalize() * settings.AI_CHASE_SPEED
+
         if player.can_kick(self.ball):
+            if player.decision_timer > 0:
+                return
             goal_pos = pygame.math.Vector2(self.team.target_goal)
             if player.position.distance_to(goal_pos) < settings.AI_SHOOT_DISTANCE:
                 player.shoot(self.ball, self.team.target_goal)
-            else:
+                player.decision_timer = 0.8
+            elif self.pass_cooldown <= 0:
                 target = self._find_pass_target(player)
                 if target:
                     player.pass_ball(self.ball, target.position)
+                    self.pass_cooldown = settings.AI_PASS_COOLDOWN
+                    player.decision_timer = 0.8
 
 
     def _chaser_logic(self, player, dt):
         """The closest player chases the ball. If they have it, evaluate options."""
         if player.can_kick(self.ball):
-            
-            # Phase C: Decision delay based on composure
             if player.decision_timer > 0:
-                self._move_toward(player, player.position, 0) # Wait and protect ball
+                self._move_toward(player, player.position, 0)
                 return
+
 
             goal_pos = pygame.math.Vector2(self.team.target_goal)
             dist_to_goal = player.position.distance_to(goal_pos)

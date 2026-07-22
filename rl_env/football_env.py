@@ -71,11 +71,10 @@ class FootballEnv:
         self.max_steps = settings.RL_MAX_STEPS
         self.current_step = 0
 
-        # Initialize pygame (headless if not rendering)
-        if not render:
-            os.environ["SDL_VIDEODRIVER"] = "dummy"
+        # Initialize pygame
+        if not pygame.get_init():
+            pygame.init()
 
-        pygame.init()
 
         if render:
             self.screen = pygame.display.set_mode(

@@ -43,8 +43,10 @@ class Game:
         self._init_gameplay()
 
     def _init_gameplay(self):
+        match_stats.reset()
         self.team_a = Team(0, settings.TEAM_A_COLOR, "4-3-3", 1)
         self.team_b = Team(1, settings.TEAM_B_COLOR, "4-4-2", -1)
+
 
         # 100% Autonomous — No player is manually keyboard-controlled
         for p in self.team_a.players:

@@ -84,28 +84,51 @@ class Ball(Entity):
         w = settings.SCREEN_WIDTH
         h = settings.SCREEN_HEIGHT
 
-        # Check if inside goal mouth opening
-        in_goal_mouth = (gt <= self.position.y <= gb)
-
-        # Left boundary
-        if self.position.x - self.radius < 0:
-            if not (in_goal_mouth and self.position.x > -gw):
-                self.position.x = self.radius
-                self.velocity_3d.x *= -self.wall_bounce_damping
-
-        # Right boundary
-        if self.position.x + self.radius > w:
-            if not (in_goal_mouth and self.position.x < w + gw):
-                self.position.x = w - self.radius
-                self.velocity_3d.x *= -self.wall_bounce_damping
-
-        # Top boundary
+        # 1. Pitch Top & Bottom Boundaries
         if self.position.y - self.radius < 0:
             self.position.y = self.radius
             self.velocity_3d.y *= -self.wall_bounce_damping
 
-        # Bottom boundary
         if self.position.y + self.radius > h:
             self.position.y = h - self.radius
             self.velocity_3d.y *= -self.wall_bounce_damping
+
+        # 2. Left Side (Pitch & Goal Net Box)
+        if self.position.x - self.radius < 0:
+            if gt <= self.position.y <= gb:
+                # Inside left goal mouth -> back net boundary is -gw
+                if self.position.x - self.radius < -gw:
+                    self.position.x = -gw + self.radius
+                    self.velocity_3d.x *= -self.wall_bounce_damping
+                # Net top & bottom post boundary inside goal
+                if self.position.y - self.radius < gt:
+                    self.position.y = gt + self.radius
+                    self.velocity_3d.y *= -self.wall_bounce_damping
+                elif self.position.y + self.radius > gb:
+                    self.position.y = gb - self.radius
+                    self.velocity_3d.y *= -self.wall_bounce_damping
+            else:
+                # Outside goal mouth -> pitch boundary is x = 0
+                self.position.x = self.radius
+                self.velocity_3d.x *= -self.wall_bounce_damping
+
+        # 3. Right Side (Pitch & Goal Net Box)
+        if self.position.x + self.radius > w:
+            if gt <= self.position.y <= gb:
+                # Inside right goal mouth -> back net boundary is w + gw
+                if self.position.x + self.radius > w + gw:
+                    self.position.x = w + gw - self.radius
+                    self.velocity_3d.x *= -self.wall_bounce_damping
+                # Net top & bottom post boundary inside goal
+                if self.position.y - self.radius < gt:
+                    self.position.y = gt + self.radius
+                    self.velocity_3d.y *= -self.wall_bounce_damping
+                elif self.position.y + self.radius > gb:
+                    self.position.y = gb - self.radius
+                    self.velocity_3d.y *= -self.wall_bounce_damping
+            else:
+                # Outside goal mouth -> pitch boundary is x = w
+                self.position.x = w - self.radius
+                self.velocity_3d.x *= -self.wall_bounce_damping
+
 

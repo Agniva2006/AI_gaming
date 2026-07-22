@@ -57,10 +57,9 @@ class SelfPlayEnv:
         self.max_steps = settings.RL_MAX_STEPS
         self.current_step = 0
 
-        if not render:
-            os.environ["SDL_VIDEODRIVER"] = "dummy"
+        if not pygame.get_init():
+            pygame.init()
 
-        pygame.init()
 
         if render:
             self.screen = pygame.display.set_mode(

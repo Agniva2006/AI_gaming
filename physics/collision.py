@@ -14,6 +14,7 @@ class CollisionSystem:
         """Run all collision checks. Called once per frame AFTER entity updates."""
         self._resolve_player_ball_collisions()
         self._resolve_player_player_collisions()
+        self._clamp_player_pitch_bounds()
 
     def _resolve_player_ball_collisions(self):
         for player in self.players:
@@ -50,3 +51,10 @@ class CollisionSystem:
 
                     p1.position -= push_dir * (overlap / 2)
                     p2.position += push_dir * (overlap / 2)
+
+    def _clamp_player_pitch_bounds(self):
+        w, h = settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT
+        for player in self.players:
+            r = player.radius
+            player.position.x = max(r, min(player.position.x, w - r))
+            player.position.y = max(r, min(player.position.y, h - r))

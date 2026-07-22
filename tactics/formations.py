@@ -51,4 +51,10 @@ def get_tactical_target(role, base_pos, ball_pos, attack_dir):
 
     target.x += shift_x
     target.y += shift_y
+
+    w, h = settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT
+    r = settings.PLAYER_RADIUS
+    target.x = max(r, min(target.x, w - r))
+    target.y = max(r, min(target.y, h - r))
     return target
+
