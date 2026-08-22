@@ -1,154 +1,140 @@
-# ⚽ RL Train Football: Multi-Agent Deep Reinforcement Learning Engine
+# ⚽ RL Train Football
 
-<div align="center">
+A multi-agent autonomous football simulation powered by Graph Neural Networks and Proximal Policy Optimization (PPO), with a full-stack SaaS backend and web dashboard.
 
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-(CUDA_GPU)-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
-![Pygame](https://img.shields.io/badge/Pygame-2.6.1-339933?style=for-the-badge&logo=pygame&logoColor=white)
-![Architecture](https://img.shields.io/badge/Architecture-GNN_PPO_GAN_Diffusion-8A2BE2?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-100%25_Autonomous_MARL-00C853?style=for-the-badge)
+## What It Does
 
-</div>
+- **Autonomous Matches**: Two teams of 11 AI-controlled players play full 3-minute football matches with zero human input
+- **Neural Network AI**: A Graph Attention Network (GAT) encodes spatial player relationships, feeding into a PPO Actor-Critic policy for tactical decision-making
+- **Real-Time Visualization**: A Pygame 2.5D engine renders the match with dynamic camera tracking, particle effects, and physical goal net ripples
+- **SaaS Backend**: A FastAPI REST API provides user authentication, tactical formation storage, model weight downloads, and Stripe billing integration
+- **Web Dashboard**: A glassmorphic browser-based dashboard with a drag-and-drop formation editor, live telemetry charts, and subscription management
 
-> *"Commercial football video games rely on rigid, scripted loops that fail in dynamic match scenarios. **RL Train Football** breaks the paradigm using Graph Attention Networks (GAT), PPO Actor-Critic policies, and GAN Trajectory Realism Discriminators."*
-
----
-
-## ⚡ Why Commercial Games Fail vs. RL Train Football
-
-| Feature | EA Sports FC / FIFA | Football Manager | **RL Train Football** |
-| :--- | :--- | :--- | :--- |
-| **Teammate Tactical AI** | Rigid IF-THEN scripts & predetermined runs | Text-based statistical dice rolls | **Multi-Head Graph Attention (GAT)**: Dynamic spatial passing channel computation |
-| **Movement Mechanics** | Unrealistic "skating on ice" direction flips | 2D circle translation | **Physical Inertia Engine**: Linear acceleration ($a = 800\,\text{px/s}^2$) & turning momentum |
-| **Anti-Jitter Realism** | Exploitable AI loops & robotic movement | No physical trajectory evaluation | **GAN Realism Discriminator**: Trajectory evaluation penalizing unnatural RL jitter |
-| **Ball Physics** | Simple 2D ground trajectories | Simplified 2D math | **3D Aerodynamics**: Magnus spin curving, vertical elevation ($z$-axis gravity), bounce damping |
-| **Tactical Autonomy** | Requires manual player switching | Non-interactive simulation | **100% Autonomous MARL**: 22 PyTorch neural agents competing across 5 formations |
-
----
-
-## 🏛️ Deep AI System Architecture
-
-```mermaid
-flowchart TD
-    PitchState[Pitch State: 22 Players + Ball Coordinates] --> GraphConst[Dynamic 23-Node Spatial Graph Construction]
-    GraphConst --> GAT[GAT Spatial Graph Encoder - Multi-Head Attention]
-    GAT --> PPO[PyTorch PPO Actor-Critic Neural Policy]
-    PPO --> ActionExec[Autonomous Agent Actions: Movement, Pass, Shoot, Press]
-    ActionExec --> PhysicsEngine[3D Aerodynamics & Inertia Physics Engine]
-    PhysicsEngine --> GAN[GAN Motion Realism Discriminator]
-    GAN --> RewardShaping[GAN Realism Reward Penalty/Bonus]
-    Diffusion[Generative Diffusion Synthesizer] --> ScenarioInit[Tactical Scenario Initializer: 3v2, High Press, Low Block]
-```
-
----
-
-## 🔬 Mathematical Formulation
-
-### 1. Multi-Head Graph Attention (GAT) Spatial Passing Encoder
-Instead of flattening player coordinates into a primitive vector, the engine models the pitch as a dynamic **23-node spatial graph** $\mathcal{G} = (\mathcal{V}, \mathcal{E})$. Passing channel openness and defender marking pressure are derived via Multi-Head Graph Attention:
-
-$$\alpha_{ij}^{(h)} = \frac{\exp\left(\text{LeakyReLU}\left(\mathbf{a}_h^T [\mathbf{W}_h h_i \parallel \mathbf{W}_h h_j]\right)\right)}{\sum_{k \in \mathcal{N}_i} \exp\left(\text{LeakyReLU}\left(\mathbf{a}_h^T [\mathbf{W}_h h_i \parallel \mathbf{W}_h h_k]\right)\right)}$$
-
-where $\mathbf{W}_h$ is the feature transformation weight matrix for head $h$, $h_i \in \mathbb{R}^8$ represents spatial node features $(x, y, v_x, v_y, \text{team}, \text{role}, \text{stamina}, z)$, and $\alpha_{ij}^{(h)}$ measures spatial passing lane quality.
-
-### 2. Proximal Policy Optimization (PPO) Clipped Objective
-Agents optimize policy parameters $\theta$ using PPO clipped surrogate loss with Generalized Advantage Estimation (GAE):
-
-$$L^{\text{CLIP}}(\theta) = \hat{\mathbb{E}}_t \left[ \min \left( r_t(\theta)\hat{A}_t^{\text{GAE}}, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t^{\text{GAE}} \right) \right]$$
-
-$$\hat{A}_t^{\text{GAE}} = \sum_{l=0}^{\infty} (\gamma \lambda)^l \delta_{t+l}^V, \quad \text{where } \delta_t^V = r_t + \gamma V(s_{t+1}) - V(s_t)$$
-
-### 3. GAN Trajectory Realism Discriminator
-A 1D Convolutional GAN Discriminator $D_\psi$ evaluates player trajectory sequences $T = [\mathbf{x}_t, \mathbf{v}_t, \mathbf{a}_t]_{t=1}^{K}$ over time windows to penalize robotic jittering and reward fluid human momentum:
-
-$$\mathcal{L}_{\text{GAN}}(D_\psi) = \mathbb{E}_{\mathbf{x} \sim p_{\text{real}}} [\log D_\psi(\mathbf{x})] + \mathbb{E}_{\mathbf{z} \sim p_{\mathbf{z}}} [\log (1 - D_\psi(G_\theta(\mathbf{z})))]$$
-
-$$R_{\text{total}}(s_t, a_t) = R_{\text{env}}(s_t, a_t) + \lambda \cdot D_\psi(T_t)$$
-
-### 4. 3D Ball Aerodynamics & Magnus Effect
-Ball trajectory integration incorporates elevation ($z$-axis), gravity ($g = 600\,\text{px/s}^2$), vertical ground bounce damping ($0.65$), and Magnus spin curving:
-
-$$\mathbf{F}_{\text{Magnus}} = \frac{1}{2} C_M \rho A d \cdot (\boldsymbol{\omega} \times \mathbf{v})$$
-
-$$\mathbf{p}_{t+\Delta t}^{(3D)} = \mathbf{p}_t^{(3D)} + \mathbf{v}_t^{(3D)} \Delta t + \frac{1}{2} \mathbf{a}_t^{(3D)} (\Delta t)^2$$
-
----
-
-## 📂 Subsystem & Module Directory Map
-
-```text
-AI_gaming/
-├── ai/
-│   ├── ai_controller.py      # Multi-Agent PyTorch Neural Policy executor
-│   └── goalkeeper.py         # Goalkeeper linear intercept projection FSM
-├── analytics/
-│   ├── spatial_graph.py      # Voronoi pitch dominance & VAR offside engine
-│   └── report.py             # Post-match NLP tactical summary generator
-├── attributes/
-│   └── profile.py            # RPG player ratings (pace, stamina, composure, vision)
-├── debug/
-│   └── overlay.py            # F3 tactical overlay (vectors, stamina, roles)
-├── engine/
-│   ├── game.py               # Main autonomous game loop orchestrator
-│   ├── match.py              # Match state, goal net triggers, 180s match clock
-│   └── settings.py           # Pitch dimensions, physical constants, formation vectors
-├── entities/
-│   ├── ball.py               # 3D Ball entity (Magnus spin, altitude, net bounds)
-│   ├── entity.py             # 3D Vector coordinate base entity class
-│   ├── players.py            # Player entity (linear acceleration, weighted first touches)
-│   └── team.py               # Squad management & target goal setup
-├── physics/
-│   └── collision.py          # 3D player-ball & player-player pitch bound clamping
-├── rendering/
-│   ├── camera.py             # Dynamic lerp tracking camera with action zoom
-│   ├── net_physics.py        # Goal net spring-mass physical grid simulation
-│   ├── particles.py          # Grass turf particles, ball trails, goal sparks
-│   └── renderer.py           # 2.5D Renderer (directional shadows, 3D ball height, HUD)
-├── rl_env/
-│   ├── diffusion_gen.py      # Score-based Diffusion tactical scenario synthesizer
-│   ├── football_env.py       # Gymnasium-compatible RL environment interface
-│   ├── gan_discriminator.py  # Trajectory realism GAN discriminator
-│   ├── gnn_encoder.py        # Multi-Head Graph Attention Network (GAT)
-│   ├── nn_brain.py           # CUDA GPU-accelerated FootballActorCritic model
-│   └── trainer.py            # PyTorch PPO trainer with GAE advantage estimation
-├── ui/
-│   ├── dashboard.py          # Real-time live PPO telemetry dashboard overlay
-│   └── menu.py               # Modern glassmorphism UI menu system
-├── main.py                   # Application entry point
-└── README.md                 # System documentation & research specification
-```
-
----
-
-## 🚀 Quickstart & Execution
+## Quick Start
 
 ### Prerequisites
-Install Python 3.11+ and dependencies:
-```bash
-pip install pygame torch numpy scipy
-```
+- Python 3.10+
+- pip
 
-### Launch the Engine
+### Install & Run
+
 ```bash
+cd AI_gaming
+pip install -r requirements.txt
 python main.py
 ```
 
-### Interactive Menu Modes
-1. **1. RL TACTICAL CLASH**: Watch 100% autonomous GNN-PPO neural models compete in full matches (`4-3-3`, `4-4-2`, `3-5-2`, `4-2-3-1`, `5-3-2`).
-2. **2. LIVE PPO SELF-PLAY TRAINING**: Launch interactive training with live visual telemetry graphs.
-3. **3. SPATIAL VORONOI ANALYTICS**: Analyze spatial pitch dominance zones and dynamic passing networks.
-4. **4. FORMATION & TACTICAL MANAGER**: Customize team formations and PyTorch model checkpoints.
+This starts both the FastAPI backend (port 8000) and the Pygame visualization simultaneously.
 
----
+### Controls
 
-## 🎮 Keyboard Shortcuts
-- **F3**: Toggle Visual Tactical Overlay (intended movement vectors, stamina bars, role tags)
-- **ESC**: Return to Main Menu
+| Key | Action |
+|-----|--------|
+| **↑/↓ or W/S** | Navigate menu |
+| **Enter/Space** | Select menu option |
+| **F3** | Toggle debug overlay (velocity vectors, stamina) |
+| **ESC** | Return to menu |
 
----
+### Web Dashboard
+Open `frontend/index.html` in your browser while `main.py` is running. The dashboard connects to the API at `localhost:8000`.
 
-<div align="center">
+## Architecture
 
-*“Football is played with the head. Your feet are just the tools.”* — **RL Train Football Engine**
+```
+main.py
+├── Process 1: FastAPI Backend (uvicorn, port 8000)
+│   ├── JWT Authentication (/auth/*)
+│   ├── Formation CRUD (/tactics/*)
+│   ├── Model Download (/ai/models/download)
+│   ├── Stripe Billing (/payment/*)
+│   └── WebSocket Telemetry (/ws/telemetry)
+│
+└── Process 2: Pygame Engine (main thread)
+    ├── Game State Machine (Menu → Gameplay → Training)
+    ├── Entity System (22 Players + Ball, 3D physics)
+    ├── AI Controllers (GNN inference + FSM fallback)
+    ├── Physics (collisions, gravity, Magnus spin)
+    └── 2.5D Renderer (camera, particles, net physics)
+```
 
-</div>
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Game Engine | Pygame 2.x |
+| Neural Networks | PyTorch (GAT + PPO Actor-Critic) |
+| Backend API | FastAPI + Uvicorn |
+| Authentication | JWT (PyJWT) + bcrypt |
+| Payments | Stripe API (sandbox mode) |
+| Frontend | Vanilla HTML/CSS/JS + Chart.js |
+| Data | JSON flat-file database |
+
+## Key Technical Decisions
+
+- **Dual-process architecture**: Pygame and FastAPI run in separate OS processes via `multiprocessing` to avoid GIL contention and Pygame's single-threaded event loop blocking the API
+- **GNN for spatial reasoning**: A Graph Attention Network dynamically constructs adjacency graphs based on player proximity (350px threshold), allowing the policy to reason about passing lanes and marking pressure
+- **FSM + Neural hybrid**: The AI uses neural network inference when a trained checkpoint exists, with a deterministic FSM fallback for reliable behavior without trained weights
+- **Thread-safe database**: The JSON user database uses `threading.Lock` to prevent corruption during concurrent API requests
+
+## Project Structure
+
+| Directory | Files | Purpose |
+|-----------|-------|---------|
+| `engine/` | 3 | Game loop, match rules, configuration (116 constants) |
+| `entities/` | 4 | 3D entity base class, player physics, ball physics, team factory |
+| `ai/` | 2 | Outfield AI controller, dedicated goalkeeper AI with shot prediction |
+| `rl_env/` | 7 | Neural network, GNN encoder, RL environment, PPO trainer, self-play |
+| `tactics/` | 2 | Formation coordinates (4-3-3, 4-4-2), dynamic tactical manager |
+| `rendering/` | 4 | 2.5D renderer, dynamic camera, particles, spring-mass goal nets |
+| `backend/` | 4 | FastAPI app, JWT auth, Stripe payments, user database |
+| `frontend/` | 3 | SPA dashboard, CSS theme, auth client |
+| `physics/` | 1 | Collision detection and resolution |
+| `analytics/` | 2 | Spatial analysis (offside line, compactness), post-match reports |
+| `stats/` | 1 | Match statistics tracking (possession, shots, tackles) |
+
+## Sample Match Output
+
+```
+========================================
+          FULL TIME MATCH REPORT
+========================================
+Score: BLUE (4-3-3)  2 - 1  RED (4-4-2)
+----------------------------------------
+Possession:         52.3%  |  47.7%
+Passes Attempted:   34     |  28
+Shots:              12     |  9
+Tackles/Recoveries: 18     |  22
+----------------------------------------
+TACTICAL SUMMARY:
+> A tightly contested match. Both tactical systems neutralized each
+> other, resulting in a fierce battle for the middle third.
+========================================
+```
+
+## Known Limitations
+
+- The GNN-PPO model requires pre-training via `rl_env/trainer.py` or `rl_env/self_play.py` before neural inference produces intelligent behavior. Without a trained checkpoint, the AI falls back to a deterministic FSM
+- The `TacticalDiffusionGenerator` and `TrajectoryDiscriminator` modules are implemented but require training on match trajectory data before activation
+- Stripe billing runs in sandbox mode by default (no real charges). Set `STRIPE_API_KEY` environment variable for production
+- The web telemetry chart displays a simulated preview; real-time training data requires connecting via the WebSocket endpoint
+
+## Future Enhancements
+
+- [ ] Train the diffusion model on collected match trajectories for diverse scenario generation
+- [ ] Integrate stable-baselines3 for large-scale distributed training (scaffold in `self_play.py`)
+- [ ] Add a Voronoi-based spatial pressure heatmap to the web dashboard
+- [ ] Support additional formations (3-4-3, 4-1-4-1) in the tactical manager
+
+## Requirements
+
+```
+pygame>=2.1.0
+torch>=2.0.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pyjwt>=2.8.0
+bcrypt>=4.0.0
+pydantic[email]>=2.0.0
+stripe>=5.0.0
+numpy>=1.24.0
+```

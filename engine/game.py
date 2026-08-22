@@ -34,11 +34,20 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
         self.state = "MENU"  # MENU, GAMEPLAY, TRAIN_MODE
+        self.show_voronoi = False
 
         self.menu = MainMenu(self.screen)
         self.neural_brain = create_neural_brain()
+        
+        # Load weights if available
+        if hasattr(self.neural_brain, "load_weights"):
+            ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "rl_env", "checkpoints", "ppo_gnn_model.pt")
+            self.neural_brain.load_weights(ckpt_path)
+            
         self.trainer = PPOTrainer()
         self.dashboard = TrainingDashboard(self.screen)
+        self.show_tactics_message = False
+        self.tactics_message_timer = 0
 
         self._init_gameplay()
 
@@ -91,12 +100,21 @@ class Game:
 
             if self.state == "MENU":
                 action = self.menu.handle_event(event)
-                if action in ["neural_match", "voronoi"]:
+                if action == "neural_match":
+                    self.show_voronoi = False
+                    self._init_gameplay()
+                    self.state = "GAMEPLAY"
+                elif action == "voronoi":
+                    self.show_voronoi = True
                     self._init_gameplay()
                     self.state = "GAMEPLAY"
                 elif action == "train_mode":
+                    self.show_voronoi = False
                     self._init_gameplay()
                     self.state = "TRAIN_MODE"
+                elif action == "tactics":
+                    self.show_tactics_message = True
+                    self.tactics_message_timer = 180 # ~3 seconds at 60fps
                 elif action == "quit":
                     self.running = False
             elif self.state in ["GAMEPLAY", "TRAIN_MODE"]:
@@ -157,8 +175,13 @@ class Game:
     def _render(self, dt):
         if self.state == "MENU":
             self.menu.render()
+            if self.show_tactics_message and self.tactics_message_timer > 0:
+                font = pygame.font.SysFont("Arial", 24, bold=True)
+                surf = font.render("Note: Please use the Web Dashboard for full Tactics Customization.", True, (255, 255, 255), (153, 27, 27))
+                self.screen.blit(surf, surf.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT - 80)))
+                self.tactics_message_timer -= 1
         else:
-            self.renderer.render(self.entities, controlled_player=None, match=self.match, dt=dt)
+            self.renderer.render(self.entities, controlled_player=None, match=self.match, dt=dt, show_voronoi=self.show_voronoi)
             self.debug_overlay.render(self.screen, self.all_players)
 
             if self.state == "TRAIN_MODE":

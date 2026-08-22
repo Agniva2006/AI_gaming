@@ -128,6 +128,19 @@ class FootballEnv:
         self.ai_opponent = AIController(self.team_b, self.team_a, self.ball)
         self.ai_team_a = AIController(self.team_a, self.team_b, self.ball)
 
+        # NOTE: TacticalDiffusionGenerator integration is disabled until a
+        # pre-trained diffusion model checkpoint is available. With an untrained
+        # model, sample_scenario() outputs random noise rather than meaningful
+        # tactical positions. Enable this once diffusion_gen has been trained
+        # on real match trajectory data.
+        #
+        # import random
+        # from rl_env.diffusion_gen import TacticalDiffusionGenerator, TORCH_AVAILABLE
+        # if TORCH_AVAILABLE and random.random() < 0.2:
+        #     gen = TacticalDiffusionGenerator(state_dim=46)
+        #     diffused_state = gen.sample_scenario(1)[0]
+        #     ...
+
         # Track ball X for progress reward
         self._prev_ball_x = self.ball.position.x
 

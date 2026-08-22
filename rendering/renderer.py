@@ -24,7 +24,7 @@ class Renderer:
         # Precompute pitch stripe surfaces
         self.stripe_width = 80
 
-    def render(self, entities, controlled_player=None, match=None, dt=0.016):
+    def render(self, entities, controlled_player=None, match=None, dt=0.016, show_voronoi=False):
         # Find ball entity
         ball = next((e for e in entities if not hasattr(e, 'role_str')), None)
 
@@ -40,6 +40,10 @@ class Renderer:
 
         # 1. Clear & Draw pitch background and stripes
         self._draw_pitch()
+        
+        # 1.5 Draw Voronoi Spatial Graph Analytics
+        if show_voronoi:
+            self._draw_voronoi(entities)
 
         # 2. Draw goal nets
         self.left_net.render(self.screen, self.camera)
@@ -202,3 +206,42 @@ class Renderer:
         clock_str = f"{mins:02d}:{secs:02d}" if match.state != "FULL_TIME" else "FULL TIME"
         clock_surf = self.small_font.render(clock_str, True, (220, 220, 220))
         self.screen.blit(clock_surf, clock_surf.get_rect(center=(w // 2, 60)))
+
+    def _draw_voronoi(self, entities):
+        players = [e for e in entities if hasattr(e, 'role_str') and e.role_str != 'GK']
+        if not players: return
+        
+        # We'll use a dynamic surface covering the exact pitch dimensions (world space)
+        # to ensure it pans and scales perfectly with the camera.
+        step = 40
+        w, h = settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT
+        
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        
+        # Calculate dominance zones
+        for x in range(0, w, step):
+            for y in range(0, h, step):
+                # Find closest player
+                closest = min(players, key=lambda p: (p.position.x - x)**2 + (p.position.y - y)**2)
+                color = closest.color
+                
+                # Create semi-transparent overlay tile
+                rect = pygame.Rect(x, y, step, step)
+                pygame.draw.rect(surf, (color[0], color[1], color[2], 60), rect)
+                
+        # Draw borders for the cells
+        for x in range(0, w, step):
+            pygame.draw.line(surf, (255, 255, 255, 15), (x, 0), (x, h))
+        for y in range(0, h, step):
+            pygame.draw.line(surf, (255, 255, 255, 15), (0, y), (w, y))
+
+        # Project world surface to screen space via camera
+        p_tl = self.camera.world_to_screen(pygame.math.Vector2(0, 0))
+        p_br = self.camera.world_to_screen(pygame.math.Vector2(w, h))
+        
+        scaled_w = p_br[0] - p_tl[0]
+        scaled_h = p_br[1] - p_tl[1]
+        
+        if scaled_w > 0 and scaled_h > 0:
+            scaled_surf = pygame.transform.scale(surf, (int(scaled_w), int(scaled_h)))
+            self.screen.blit(scaled_surf, p_tl)

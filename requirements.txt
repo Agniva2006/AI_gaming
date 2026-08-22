@@ -1,0 +1,9 @@
+pygame>=2.1.0
+torch>=2.0.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pyjwt>=2.8.0
+bcrypt>=4.0.0
+pydantic[email]>=2.0.0
+stripe>=5.0.0
+numpy>=1.24.0

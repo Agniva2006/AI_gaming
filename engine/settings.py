@@ -93,8 +93,9 @@ ROLE_FWD = (9, 10)
 AI_SPEED = 180                      # slightly slower than human for fairness
 AI_CHASE_SPEED = 200
 AI_PRESS_DISTANCE = 250             # how close before AI presses ball carrier
-AI_SHOOT_DISTANCE = 300             # how close to goal before AI shoots
-AI_PASS_COOLDOWN = 0.5              # seconds between AI passes
+AI_SHOOT_DISTANCE = 180             # how close to goal before AI shoots (was 300 — too generous)
+AI_PASS_COOLDOWN = 0.4              # seconds between AI passes
+AI_SHOOT_COOLDOWN = 1.2             # seconds between AI shots (prevents spamming)
 AI_BALL_SHIFT_FACTOR = 0.25         # how much formation shifts toward ball (0-1)
 
 # --- Match constants ---
