@@ -308,3 +308,60 @@ async def download_model(current_user: dict = Depends(get_current_user)):
         filename="ppo_gnn_model.pt",
         media_type="application/octet-stream"
     )
+
+
+# -------------------------------------------------------------
+# 0.01% MLSYS & DISTRIBUTED SYSTEMS ENDPOINTS
+# -------------------------------------------------------------
+from rl_env.ray_distributed_trainer import swarm_trainer
+from analytics.voronoi_engine import voronoi_engine
+from backend.telemetry_gateway import telemetry_buffer
+
+class SwarmTrainRequest(BaseModel):
+    steps_per_worker: Optional[int] = 128
+    epochs: Optional[int] = 2
+    batch_size: Optional[int] = 64
+
+class PitchControlRequest(BaseModel):
+    team_red: Optional[List[List[float]]] = None
+    team_blue: Optional[List[List[float]]] = None
+    ball: Optional[List[float]] = [52.5, 34.0]
+
+@app.post("/swarm/train-step")
+def run_swarm_train_step(req: SwarmTrainRequest, current_user: dict = Depends(get_current_user)):
+    """Execute a parallel distributed swarm PPO training step with GAE."""
+    res = swarm_trainer.train_step(
+        steps_per_worker=req.steps_per_worker,
+        epochs=req.epochs,
+        batch_size=req.batch_size
+    )
+    return {"success": True, "swarm_telemetry": res}
+
+@app.post("/analytics/pitch-control")
+def evaluate_pitch_control(req: PitchControlRequest, current_user: dict = Depends(get_current_user)):
+    """Calculate real-time Voronoi pitch dominance, team compactness, and passing vulnerability."""
+    res = voronoi_engine.compute_pitch_control(
+        team_red_positions=req.team_red,
+        team_blue_positions=req.team_blue,
+        ball_pos=tuple(req.ball) if req.ball else (52.5, 34.0)
+    )
+    return {"success": True, "analytics": res}
+
+@app.get("/telemetry/buffer-stats")
+def get_telemetry_buffer_stats():
+    """Return 120 Hz lock-free circular ring buffer throughput and drop metrics."""
+    return telemetry_buffer.get_buffer_stats()
+
+@app.post("/telemetry/mock-tick")
+def ingest_mock_telemetry_tick():
+    """Simulate a 120 Hz game physics tick ingested into the circular buffer."""
+    import random
+    import time
+    players = [{"x": random.uniform(5, 95), "y": random.uniform(5, 60), "vx": random.uniform(-2, 2), "vy": random.uniform(-2, 2)} for _ in range(22)]
+    ball = {"x": random.uniform(10, 90), "y": random.uniform(10, 55), "z": random.uniform(0, 3), "vx": random.uniform(-5, 5), "vy": random.uniform(-5, 5), "vz": random.uniform(0, 2)}
+    raw_bytes = telemetry_buffer.ingest_frame(player_states=players, ball_state=ball, match_time=time.time(), score=[1, 0])
+    return {
+        "status": "INGESTED",
+        "binary_frame_bytes": len(raw_bytes),
+        "buffer_stats": telemetry_buffer.get_buffer_stats()
+    }

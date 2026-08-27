@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style-auth.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="pitch3d.js"></script>
   <style>
     /* ===== PITCH & TACTICAL WORKSPACE ===== */
     .dashboard-container {
@@ -243,13 +245,15 @@
           <p>Drag nodes to design custom player coordinate offsets. Pass lanes are constructed via GNN attention scores.</p>
         </div>
         <div style="display:flex;gap:12px">
+          <button class="btn-action" id="toggle3DBtn" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)" onclick="toggle3DView()">🏟️ 3D WebGL Stadium</button>
           <button class="btn-action" style="background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);color:var(--text-main)" onclick="resetPitch()">Reset Positions</button>
           <button class="btn-action" onclick="saveTacticToAccount()">Save Tactic Formation</button>
         </div>
       </div>
 
-      <div class="pitch-canvas-wrapper">
+      <div class="pitch-canvas-wrapper" id="pitchCanvasWrapper">
         <canvas id="pitchCanvas" width="960" height="540"></canvas>
+        <div id="pitch3dContainer" style="display:none;width:100%;height:100%;min-height:540px;position:relative;"></div>
       </div>
 
       <div class="telemetry-grid" style="margin-top:20px">
@@ -928,6 +932,29 @@
 
     // Startup Init
     loadPreset("4-3-3");
+
+    // 3D WebGL Three.js Stadium View Toggle
+    let is3DMode = false;
+    let pitch3dInst = null;
+    function toggle3DView() {
+      is3DMode = !is3DMode;
+      const canvas2d = document.getElementById("pitchCanvas");
+      const container3d = document.getElementById("pitch3dContainer");
+      const btn = document.getElementById("toggle3DBtn");
+
+      if (is3DMode) {
+        canvas2d.style.display = "none";
+        container3d.style.display = "block";
+        btn.innerHTML = "📋 2D Tactical View";
+        if (!pitch3dInst && window.Pitch3DVisualizer) {
+          pitch3dInst = new Pitch3DVisualizer("pitch3dContainer");
+        }
+      } else {
+        canvas2d.style.display = "block";
+        container3d.style.display = "none";
+        btn.innerHTML = "🏟️ 3D WebGL Stadium";
+      }
+    }
   </script>
 </body>
 </html>
