@@ -289,4 +289,8 @@ class FootballEnv:
 
     def close(self):
         """Clean up."""
-        pygame.quit()
+        if pygame.get_init():
+            try:
+                pygame.quit()
+            except Exception:
+                pass

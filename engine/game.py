@@ -38,6 +38,7 @@ class Game:
         self.state = "MENU"  # MENU, GAMEPLAY, TRAIN_MODE
         self.is_human_mode = True
         self.show_tactics = False
+        self.show_tacticai = False
 
         self.menu = MainMenu(self.screen)
         self.neural_brain = create_neural_brain()
@@ -136,6 +137,9 @@ class Game:
                     # Toggle tactical overlay (VAR offside line, passing network)
                     elif event.key == pygame.K_t:
                         self.show_tactics = not self.show_tactics
+                    # Toggle Google DeepMind TacticAI predictive overlay
+                    elif event.key == pygame.K_y:
+                        self.show_tacticai = not self.show_tacticai
                     # In-game Tactical Mentality Hotkeys
                     elif event.key == pygame.K_1:
                         self.manager_a.set_strategy(TacticalStrategy.BALANCED)
@@ -305,7 +309,8 @@ class Game:
                 match=self.match,
                 dt=dt,
                 show_tactics=self.show_tactics,
-                tactical_name=self.manager_a.get_profile()["name"]
+                tactical_name=self.manager_a.get_profile()["name"],
+                show_tacticai=self.show_tacticai
             )
             self.debug_overlay.render(self.screen, self.all_players)
 

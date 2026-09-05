@@ -150,8 +150,11 @@ def generate_expert_dataset(num_episodes=15, max_steps=250):
 
         while not done and step < max_steps:
             step += 1
-            if step % 50 == 0:
-                pygame.event.pump()
+            if step % 50 == 0 and pygame.get_init():
+                try:
+                    pygame.event.pump()
+                except Exception:
+                    pass
 
             expert_action = expert.decide_action(obs, env=env)
             next_obs, reward, done, _ = env.step(expert_action)

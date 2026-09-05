@@ -83,6 +83,17 @@ def run_all_tests():
     assert res.json()["success"] is True
     print(f"  -> Behavioral Cloning API Verified: Accuracy={res.json()['result']['accuracy']}%")
 
+    res = client.post("/api/ai/train-step", json={"episodes": 1})
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+    print(f"  -> PPO Train Step API Verified: Reward={res.json()['result']['reward']}, Loss={res.json()['result']['loss']}")
+
+    # 6. DeepMind TacticAI API Endpoint (Nature Communications 2024)
+    res = client.post("/api/tacticai/evaluate", json={"team_a_formation": "4-3-3", "team_b_formation": "4-4-2"})
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+    print(f"  -> DeepMind TacticAI API Verified: Shot Threat={res.json()['shot_probability_pct']}%, Top Receiver={res.json()['top_receivers'][0]['role']}")
+
     print("=== [2/5] Testing Physics, Collision & Dynamic Mechanics ===")
     from physics.collision import CollisionSystem
     from entities.ball import Ball
@@ -156,6 +167,25 @@ def run_all_tests():
     assert summary["favored_flank"] == "LEFT WING"
     assert strategy["flank_shift_y"] < 0
     print(f"  -> AI Opponent Profiler verified: Favored={summary['favored_flank']}, Shift={strategy['flank_shift_y']}")
+
+    # Google DeepMind TacticAI Mathematical Reflection Invariance Test (Nature 2024)
+    from ai.tactic_ai import tactic_ai_engine, D2DihedralTransformer
+    import torch
+    x_test = torch.randn(1, 22, 8)
+    e_test = torch.randn(1, 22, 22, 2)
+    with torch.no_grad():
+        h_orig = tactic_ai_engine.forward_backbone(x_test, e_test)
+        x_horiz = x_test.clone()
+        x_horiz[..., 0] = 1.0 - x_horiz[..., 0]
+        x_horiz[..., 2] = -x_horiz[..., 2]
+        h_flipped = tactic_ai_engine.forward_backbone(x_horiz, e_test)
+        diff = torch.abs(h_orig - h_flipped).mean().item()
+        assert diff < 1e-4
+        rec_probs = tactic_ai_engine.predict_receivers(x_test, e_test)
+        assert abs(rec_probs.sum().item() - 1.0) < 1e-4
+        adj_list = tactic_ai_engine.recommend_defensive_adjustments(team_a.players, team_b.players, ball)
+        assert len(adj_list) > 0
+    print(f"  -> DeepMind TacticAI D2 Invariance ({diff:.6f}) & Defensive Shifts ({len(adj_list)} adjustments) verified.")
 
     print("=== [4/5] Testing Analytics: Expected Goals (xG), VAR Line & Shot Map ===")
     from analytics.xg_engine import XGEngine

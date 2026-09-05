@@ -11,6 +11,8 @@ const ctx = canvas ? canvas.getContext("2d") : null;
 let currentFormationType = "4-3-3";
 let players = [];
 let draggingPlayer = null;
+let latestTacticAIData = null;
+let showTacticAIRefinements = false;
 
 const DEFAULT_PRESETS = {
   "4-3-3": [
@@ -682,6 +684,105 @@ function drawPitch() {
     ctx.textBaseline = "middle";
     ctx.fillText(p.role, px, py);
   });
+
+  // TacticAI: Draw Top-3 Receiver Halos (Google DeepMind Nature 2024)
+  if (latestTacticAIData && latestTacticAIData.top_receivers) {
+    latestTacticAIData.top_receivers.slice(0, 3).forEach((rec, idx) => {
+      const p = players.find(pl => pl.role === rec.role);
+      if (p) {
+        const px = p.x * w;
+        const py = p.y * h;
+        ctx.strokeStyle = (idx === 0) ? "#f59e0b" : "#38bdf8";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(px, py, radius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = (idx === 0) ? "#f59e0b" : "#38bdf8";
+        ctx.font = `bold ${Math.round(radius * 0.65)}px Inter, sans-serif`;
+        ctx.fillText(`Rec: ${rec.percentage}%`, px, py - radius - 10);
+      }
+    });
+  }
+
+  // TacticAI: Draw Defensive Adjustments ("What-If" Counter-Factual Shifts)
+  if (showTacticAIRefinements && latestTacticAIData && latestTacticAIData.defensive_refinements) {
+    ctx.strokeStyle = "#f97316";
+    ctx.fillStyle = "#f97316";
+    ctx.lineWidth = 2;
+    latestTacticAIData.defensive_refinements.forEach(adj => {
+      const origX = (adj.current_x / 1280) * w;
+      const origY = (adj.current_y / 720) * h;
+      const suggX = (adj.suggested_x / 1280) * w;
+      const suggY = (adj.suggested_y / 720) * h;
+
+      ctx.beginPath();
+      ctx.moveTo(origX, origY);
+      ctx.lineTo(suggX, suggY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(suggX, suggY, radius * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.font = `bold 10px Inter, sans-serif`;
+      ctx.fillText(`Cover ${adj.target_attacker_role}`, suggX, suggY - 10);
+    });
+  }
+}
+
+// ===== TACTICAI ASSISTANT (DEEPMIND NATURE 2024) =====
+async function evaluatePitchWithTacticAI() {
+  const evalBtn = document.getElementById("tacticaiEvalBtn");
+  if (evalBtn) {
+    evalBtn.disabled = true;
+    evalBtn.innerText = "Evaluating...";
+  }
+  showToast("🧠 Running Google DeepMind TacticAI analysis...");
+  try {
+    const coords = players.map(p => [p.x, p.y]);
+    const res = await fetch(`${API_BASE}/api/tacticai/evaluate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ team_a_coords: coords, team_a_formation: currentFormationType })
+    });
+    const json = await res.json();
+    if (json.success) {
+      latestTacticAIData = json;
+      const badge = document.getElementById("tacticaiShotBadge");
+      if (badge) badge.innerText = `xG Threat: ${json.shot_probability_pct}%`;
+      const recList = document.getElementById("tacticaiReceiverList");
+      if (recList && json.top_receivers) {
+        recList.innerHTML = json.top_receivers.slice(0, 4).map(r => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;">
+            <span><strong>#${r.rank} ${r.role}</strong> (P${r.player_id})</span>
+            <span style="color:#38bdf8;font-weight:700;">${r.percentage}%</span>
+          </div>
+        `).join("");
+      }
+      drawPitch();
+      showToast(`🎯 TacticAI Analysis Complete: Shot Threat ${json.shot_probability_pct}%`);
+    } else {
+      showToast("TacticAI analysis failed.");
+    }
+  } catch (e) {
+    showToast("TacticAI request failed.");
+  } finally {
+    if (evalBtn) {
+      evalBtn.disabled = false;
+      evalBtn.innerText = "🧠 Evaluate with TacticAI";
+    }
+  }
+}
+
+function toggleTacticAIRefinements() {
+  showTacticAIRefinements = !showTacticAIRefinements;
+  const btn = document.getElementById("tacticaiRefineBtn");
+  if (btn) {
+    btn.innerText = showTacticAIRefinements ? "Hide Defensive Shifts" : "Show Defensive Shifts";
+    btn.style.background = showTacticAIRefinements ? "rgba(249,115,22,0.2)" : "transparent";
+  }
+  drawPitch();
 }
 
 function onCanvasMouseDown(e) {

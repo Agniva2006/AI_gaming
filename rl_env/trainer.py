@@ -2,6 +2,12 @@ import os
 import numpy as np
 
 try:
+    import pygame
+    PYGAME_AVAILABLE = True
+except ImportError:
+    PYGAME_AVAILABLE = False
+
+try:
     import torch
     import torch.nn as nn
     import torch.optim as optim
@@ -167,8 +173,11 @@ class PPOTrainer:
             step_cnt = 0
             while not done:
                 step_cnt += 1
-                if step_cnt % 30 == 0:
-                    pygame.event.pump()
+                if step_cnt % 30 == 0 and PYGAME_AVAILABLE and pygame.get_init():
+                    try:
+                        pygame.event.pump()
+                    except Exception:
+                        pass
 
                 self.brain.eval()
                 with torch.no_grad():

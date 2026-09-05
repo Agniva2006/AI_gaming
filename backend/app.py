@@ -333,6 +333,69 @@ async def download_model():
     )
 
 # -------------------------------------------------------------
+# GOOGLE DEEPMIND TACTICAI ENDPOINTS (NATURE COMMUNICATIONS 2024)
+# -------------------------------------------------------------
+@app.post("/api/tacticai/evaluate")
+async def evaluate_tacticai(req: Optional[Dict[str, Any]] = None):
+    """
+    Evaluates 22-player pitch setup using Google DeepMind TacticAI:
+    Returns receiver probabilities, decomposed shot threat (Eq. 1),
+    and generative defensive adjustment recommendations (Fig. 3).
+    """
+    from ai.tactic_ai import tactic_ai_engine, build_tacticai_graph
+    from entities.team import Team
+    from entities.ball import Ball
+    import pygame
+    import numpy as np
+
+    if not tactic_ai_engine:
+        raise HTTPException(status_code=503, detail="TacticAI model unavailable.")
+
+    team_a_form = req.get("team_a_formation", "4-3-3") if req else "4-3-3"
+    team_b_form = req.get("team_b_formation", "4-4-2") if req else "4-4-2"
+
+    from engine import settings
+    team_a = Team(0, settings.TEAM_A_COLOR, team_a_form, 1)
+    team_b = Team(1, settings.TEAM_B_COLOR, team_b_form, -1)
+    ball = Ball(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2)
+
+    if req and "team_a_coords" in req and len(req["team_a_coords"]) == 11:
+        for idx, (nx, ny) in enumerate(req["team_a_coords"]):
+            team_a.players[idx].position = pygame.math.Vector2(nx * settings.SCREEN_WIDTH, ny * settings.SCREEN_HEIGHT)
+
+    node_feats, edge_attr = build_tacticai_graph(team_a.players, team_b.players, ball)
+
+    import torch
+    with torch.no_grad():
+        tactic_ai_engine.eval()
+        probs = tactic_ai_engine.predict_receivers(node_feats, edge_attr)[0].cpu().numpy()
+        shot_prob, _ = tactic_ai_engine.predict_shot_probability(node_feats, edge_attr)
+        shot_p = float(shot_prob.item())
+
+    top_indices = np.argsort(probs[:11])[::-1]
+    receivers = []
+    for rank, idx in enumerate(top_indices[:5]):
+        p = team_a.players[idx]
+        receivers.append({
+            "rank": rank + 1,
+            "player_id": getattr(p, 'id', p.role_index),
+            "role": p.role_str,
+            "probability": round(float(probs[idx]), 3),
+            "percentage": round(float(probs[idx]) * 100, 1)
+        })
+
+    refinements = tactic_ai_engine.recommend_defensive_adjustments(team_a.players, team_b.players, ball)
+
+    return {
+        "success": True,
+        "paper": "TacticAI: an AI assistant for football tactics (Nature Communications, 2024)",
+        "shot_probability": round(shot_p, 3),
+        "shot_probability_pct": round(shot_p * 100, 1),
+        "top_receivers": receivers,
+        "defensive_refinements": refinements
+    }
+
+# -------------------------------------------------------------
 # STATIC FILES SERVING (FRONTEND)
 # -------------------------------------------------------------
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")

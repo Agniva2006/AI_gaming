@@ -27,7 +27,7 @@ class Renderer:
 
         self.stripe_width = 80
 
-    def render(self, entities, controlled_player=None, match=None, dt=0.016, show_tactics=False, tactical_name="Balanced"):
+    def render(self, entities, controlled_player=None, match=None, dt=0.016, show_tactics=False, tactical_name="Balanced", show_tacticai=False):
         ball = next((e for e in entities if not hasattr(e, 'role_str')), None)
 
         if ball:
@@ -45,6 +45,10 @@ class Renderer:
         # 2. Tactical Overlay (VAR Offside Line & Passing Triangles)
         if show_tactics and match:
             self._draw_tactical_overlay(match)
+
+        # 2b. TacticAI Predictive Overlay (Google DeepMind Nature 2024)
+        if show_tacticai and match and ball:
+            self._draw_tacticai_overlay(match, controlled_player, ball)
 
         # 3. Goal nets
         self.left_net.render(self.screen, self.camera)
@@ -192,6 +196,71 @@ class Renderer:
                     sp1 = self.camera.world_to_screen(ctrl_p.position)
                     sp2 = self.camera.world_to_screen(tm.position)
                     pygame.draw.line(self.screen, lane_color[:3], sp1, sp2, 2 if not is_blocked else 1)
+
+    def _draw_tacticai_overlay(self, match, controlled_player, ball):
+        """
+        Renders Google DeepMind TacticAI Overlay (Nature Communications 2024):
+        - Halo over top predicted receivers with receiver probability percentage
+        - Recommended defensive adjustments (What-If analysis) to block passing channels
+        - Real-time shot threat indicator
+        """
+        from ai.tactic_ai import tactic_ai_engine, build_tacticai_graph
+        if not tactic_ai_engine:
+            return
+
+        team_a = match.team_a.players
+        team_b = match.team_b.players
+        node_feats, edge_attr = build_tacticai_graph(team_a, team_b, ball)
+
+        try:
+            import torch
+            with torch.no_grad():
+                tactic_ai_engine.eval()
+                probs = tactic_ai_engine.predict_receivers(node_feats, edge_attr)[0].cpu().numpy()
+                shot_prob, _ = tactic_ai_engine.predict_shot_probability(node_feats, edge_attr)
+                shot_p = float(shot_prob.item())
+
+            # 1. Top 3 receivers for Attacking Team (Team A)
+            top_rec_indices = np.argsort(probs[:11])[::-1][:3]
+            for rank, idx in enumerate(top_rec_indices):
+                target_p = team_a[idx]
+                if target_p is controlled_player:
+                    continue
+                prob_pct = int(round(probs[idx] * 100))
+                if prob_pct < 4:
+                    continue
+
+                sp = self.camera.world_to_screen(target_p.position)
+                # Halo color: Gold for #1, Cyan for #2/#3
+                halo_color = (245, 158, 11) if rank == 0 else (56, 189, 248)
+                halo_r = self.camera.scale(target_p.radius + 12 + rank * 3)
+                pygame.draw.circle(self.screen, halo_color, sp, max(1, halo_r), max(1, self.camera.scale(2)))
+
+                # Badge text
+                badge_surf = self.tiny_font.render(f"TacticAI #{rank+1} ({prob_pct}%)", True, (255, 255, 255), (15, 23, 42))
+                self.screen.blit(badge_surf, (sp[0] - badge_surf.get_width() // 2, sp[1] - halo_r - 14))
+
+            # 2. Defensive Adjustments ("What-If" Analysis)
+            adjustments = tactic_ai_engine.recommend_defensive_adjustments(team_a, team_b, ball)
+            for adj in adjustments[:4]:
+                orig_sp = self.camera.world_to_screen((adj["current_x"], adj["current_y"]))
+                sugg_sp = self.camera.world_to_screen((adj["suggested_x"], adj["suggested_y"]))
+
+                # Draw vector line to recommended containment spot
+                pygame.draw.line(self.screen, (249, 115, 22), orig_sp, sugg_sp, max(1, self.camera.scale(2)))
+                # Ghost containment ring
+                ghost_r = self.camera.scale(settings.PLAYER_RADIUS)
+                pygame.draw.circle(self.screen, (249, 115, 22), sugg_sp, max(1, ghost_r), max(1, self.camera.scale(1)))
+
+            # 3. TacticAI Status Pill
+            pill_surf = self.small_font.render(f"TacticAI | Predicted Shot Threat: {shot_p*100:.1f}%", True, (255, 255, 255))
+            pill_rect = pill_surf.get_rect(topleft=(settings.SCREEN_WIDTH - 380, 68))
+            bg_rect = pill_rect.inflate(16, 8)
+            pygame.draw.rect(self.screen, (15, 23, 42), bg_rect, border_radius=6)
+            pygame.draw.rect(self.screen, (56, 189, 248), bg_rect, 1, border_radius=6)
+            self.screen.blit(pill_surf, pill_rect)
+        except Exception:
+            pass
 
     def _draw_player_shadow(self, player):
         center = self.camera.world_to_screen(player.position + pygame.math.Vector2(3, 5))
