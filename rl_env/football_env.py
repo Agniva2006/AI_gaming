@@ -107,8 +107,8 @@ class FootballEnv:
         self.current_step = 0
 
         # Create teams
-        self.team_a = Team(0, settings.TEAM_A_COLOR, settings.FORMATION_442_A, 1)
-        self.team_b = Team(1, settings.TEAM_B_COLOR, settings.FORMATION_442_B, -1)
+        self.team_a = Team(0, settings.TEAM_A_COLOR, "4-4-2", 1)
+        self.team_b = Team(1, settings.TEAM_B_COLOR, "4-4-2", -1)
 
         # RL agent controls team A's striker
         self.controlled_player = self.team_a.players[9]
@@ -127,19 +127,6 @@ class FootballEnv:
         # AI controls opponent team and Team A's non-controlled players
         self.ai_opponent = AIController(self.team_b, self.team_a, self.ball)
         self.ai_team_a = AIController(self.team_a, self.team_b, self.ball)
-
-        # NOTE: TacticalDiffusionGenerator integration is disabled until a
-        # pre-trained diffusion model checkpoint is available. With an untrained
-        # model, sample_scenario() outputs random noise rather than meaningful
-        # tactical positions. Enable this once diffusion_gen has been trained
-        # on real match trajectory data.
-        #
-        # import random
-        # from rl_env.diffusion_gen import TacticalDiffusionGenerator, TORCH_AVAILABLE
-        # if TORCH_AVAILABLE and random.random() < 0.2:
-        #     gen = TacticalDiffusionGenerator(state_dim=46)
-        #     diffused_state = gen.sample_scenario(1)[0]
-        #     ...
 
         # Track ball X for progress reward
         self._prev_ball_x = self.ball.position.x
@@ -257,7 +244,7 @@ class FootballEnv:
 
         # Reward for ball progress toward opponent goal (right side)
         ball_progress = self.ball.position.x - self._prev_ball_x
-        reward += ball_progress * settings.RL_REWARD_BALL_PROGRESS
+        reward += ball_progress * getattr(settings, "RL_REWARD_BALL_PROGRESS", 0.001)
 
         return reward
 
